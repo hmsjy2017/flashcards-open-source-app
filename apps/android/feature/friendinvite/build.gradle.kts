@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.flashcardsopensourceapp.feature.progress"
+    namespace = "com.flashcardsopensourceapp.feature.friendinvite"
     compileSdk = 36
 
     defaultConfig {
@@ -27,19 +27,13 @@ android {
 
 dependencies {
     implementation(project(":data:local"))
-    implementation(project(":feature:friendinvite"))
 
-    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.core.ktx)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
-    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
-    implementation(libs.androidx.compose.material.icons.extended)
 
     testImplementation(libs.junit4)
     testImplementation(libs.org.jetbrains.kotlinx.coroutines.test)
