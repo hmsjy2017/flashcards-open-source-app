@@ -216,14 +216,8 @@ struct TransientBannerView: View {
 
     @ViewBuilder
     private var bannerBackground: some View {
-        if #available(iOS 26.0, *) {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.clear)
-                .glassEffect()
-        } else {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(.thinMaterial)
-        }
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .fill(.thinMaterial)
     }
 }
 

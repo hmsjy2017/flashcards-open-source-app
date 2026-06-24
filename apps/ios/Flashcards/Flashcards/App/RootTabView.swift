@@ -333,7 +333,6 @@ struct RootTabView: View {
 
     private var tabRootTasks: some View {
         self.tabRootBase
-        .tabBarMinimizeBehavior(.never)
         .task {
             store.prepareVisibleTabForPresentation(tab: self.navigation.selectedTab, now: Date())
             self.reconcileGuestSignInAfterReviewPrompt()

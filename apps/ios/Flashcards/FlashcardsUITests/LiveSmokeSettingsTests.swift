@@ -254,7 +254,7 @@ final class LiveSmokeSettingsTests: LiveSmokeTestCase {
     }
 
     // Real SpringBoard local-notification tap smoke is intentionally omitted here.
-    // On the iOS 26.4 simulator, XCTest reaches Notification Center but the system
+    // On some iOS simulator runtimes, XCTest reaches Notification Center but the system
     // routes the tap into a side-swipe hint instead of executing the default action.
 
     @MainActor

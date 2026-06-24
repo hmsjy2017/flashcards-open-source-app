@@ -1,6 +1,6 @@
 # iOS CI/CD
 
-This repository uses Xcode Cloud as the native iOS release gate and distribution path. The GitHub-side AWS/Web release workflow does not wait for Xcode Cloud on `main`.
+This repository uses GitHub Actions to build the signed iOS/iPadOS IPA. The GitHub-side AWS/Web release workflow does not wait for the iOS IPA workflow on `main`.
 We do not aim for exhaustive iOS test coverage in this pipeline. The most trusted automated signal is the native simulator-backed live smoke because it exercises the real app closest to production behavior, while any non-smoke tests should stay targeted to important native contracts.
 
 ## Native release gate
@@ -8,7 +8,7 @@ We do not aim for exhaustive iOS test coverage in this pipeline. The most truste
 The intended iOS release order is:
 
 1. Native XCUITest grouped live smoke in the grouped `apps/ios/Flashcards/FlashcardsUITests/LiveSmoke*Tests.swift` files
-2. Archive and distribution from Xcode Cloud
+2. Signed IPA archive from GitHub Actions
 
 The live smoke coverage is split into independent grouped flows across Review, Cards, AI, and Settings. Only one grouped smoke signs into the linked review account, creates an isolated linked workspace, verifies relaunch persistence, and deletes that workspace before exit. The remaining grouped smokes stay guest/local and do not perform login.
 
@@ -24,13 +24,13 @@ The shared scheme for cloud builds is:
 
 - `apps/ios/Flashcards/Flashcards Open Source App.xcodeproj/xcshareddata/xcschemes/Flashcards Open Source App.xcscheme`
 
-The shared cloud scheme runs the UI smoke bundle only. FSRS parity tests remain in `apps/ios/Flashcards/FlashcardsTests/Review` for focused local/native verification and are not part of the Xcode Cloud release gate.
+The shared scheme runs the UI smoke bundle only. FSRS parity tests remain in `apps/ios/Flashcards/FlashcardsTests/Review` for focused local/native verification and are not part of the iOS release gate.
 
-## Xcode Cloud inputs
+## GitHub Actions IPA inputs
 
-Xcode Cloud receives the same service configuration values that local builds use through `apps/ios/Flashcards/ci_scripts/ci_post_clone.sh`.
+The GitHub Actions IPA workflow receives the same service configuration values that local builds use through `apps/ios/Flashcards/ci_scripts/ci_post_clone.sh`.
 
-The required environment values are documented in [`docs/ios-local-setup.md`](ios-local-setup.md). Every Xcode Cloud workflow that builds this iOS project must define:
+The required environment values are documented in [`docs/ios-local-setup.md`](ios-local-setup.md). The `iOS IPA` GitHub Actions workflow must define:
 
 - `XCODE_CLOUD_DEVELOPMENT_TEAM`
 - `XCODE_CLOUD_APP_BUNDLE_IDENTIFIER`
@@ -42,6 +42,15 @@ The required environment values are documented in [`docs/ios-local-setup.md`](io
 - `XCODE_CLOUD_SUPPORT_EMAIL_ADDRESS`
 - `XCODE_CLOUD_SENTRY_DSN` (secure workflow value; do not commit the real DSN)
 
+Signed IPA workflows must also define these GitHub signing secrets:
+
+- `IOS_DISTRIBUTION_CERTIFICATE_BASE64`
+- `IOS_DISTRIBUTION_CERTIFICATE_PASSWORD`
+- `IOS_PROVISIONING_PROFILE_BASE64`
+- `IOS_KEYCHAIN_PASSWORD`
+- `IOS_DEVELOPMENT_TEAM`
+- `IOS_APP_BUNDLE_IDENTIFIER`
+
 Signed archive workflows must also define the Sentry debug-file upload values:
 
 - `SENTRY_AUTH_TOKEN` (secure secret)
@@ -50,11 +59,11 @@ Signed archive workflows must also define the Sentry debug-file upload values:
 
 Optional Sentry environment values:
 
-- `XCODE_CLOUD_SENTRY_ENVIRONMENT` (defaults to `production` in Xcode Cloud)
+- `XCODE_CLOUD_SENTRY_ENVIRONMENT` (defaults to `production` in CI)
 - `XCODE_CLOUD_SENTRY_TRACES_SAMPLE_RATE` (defaults to `0.0`)
 - `SENTRY_URL` (only needed for a non-default Sentry endpoint; the URL must match the endpoint that issued `SENTRY_AUTH_TOKEN`)
 
-`ci_post_clone.sh` fails the build before `xcodebuild` if any required build-time variable is missing or if any URL value is malformed for `.xcconfig` usage. `ci_post_xcodebuild.sh` fails the archive if any required Sentry upload value is missing, if `sentry-cli` cannot be downloaded, or if the downloaded binary fails SHA-256 verification.
+`ci_post_clone.sh` fails the build before `xcodebuild` if any required build-time variable is missing or if any URL value is malformed for `.xcconfig` usage. The workflow also requires signing secrets for the distribution certificate, provisioning profile, and temporary keychain. `ci_post_xcodebuild.sh` fails the archive if any required Sentry upload value is missing, if `sentry-cli` cannot be downloaded, or if the downloaded binary fails SHA-256 verification.
 
 `SENTRY_CLI_EXPECTED_SHA256` is an optional non-secret override for the pinned `sentry-cli` binary checksum. Set it only when intentionally bumping the pinned CLI version.
 
@@ -70,4 +79,4 @@ This keeps the login smoke path pinned to the intended review account instead of
 
 ## Monitoring expectations
 
-After pushing to `main`, watch Xcode Cloud separately through the full archive and distribution path. Do not assume the iOS release completed just because the GitHub-side AWS/Web release workflow is green.
+After pushing to `main`, watch the `iOS IPA` GitHub Actions workflow separately through the full archive and artifact upload path. Do not assume the iOS release completed just because the GitHub-side AWS/Web release workflow is green.
