@@ -42,7 +42,6 @@ jobs:
       CI_XCODE_CLOUD: TRUE
       ARCHIVE_PATH: tmp/ios-archives/Flashcards.xcarchive
       EXPORT_PATH: tmp/ios-export
-      KEYCHAIN_PATH: ${{ runner.temp }}/ios-signing.keychain-db
       KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
 
     steps:
@@ -81,12 +80,14 @@ jobs:
           profile_dir="${HOME}/Library/MobileDevice/Provisioning Profiles"
           printf '%s' "${IOS_DISTRIBUTION_CERTIFICATE_BASE64}" | base64 --decode > "${certificate_path}"
           printf '%s' "${IOS_PROVISIONING_PROFILE_BASE64}" | base64 --decode > "${profile_path}"
-          security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
-          security set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
-          security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
-          security import "${certificate_path}" -P "${IOS_DISTRIBUTION_CERTIFICATE_PASSWORD}" -A -t cert -f pkcs12 -k "${KEYCHAIN_PATH}"
-          security list-keychain -d user -s "${KEYCHAIN_PATH}" $(security list-keychain -d user | sed 's/[\" ]//g')
-          security set-key-partition-list -S apple-tool:,apple: -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          keychain_path="${RUNNER_TEMP}/ios-signing.keychain-db"
+          echo "KEYCHAIN_PATH=${keychain_path}" >> "${GITHUB_ENV}"
+          security create-keychain -p "${KEYCHAIN_PASSWORD}" "${keychain_path}"
+          security set-keychain-settings -lut 21600 "${keychain_path}"
+          security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${keychain_path}"
+          security import "${certificate_path}" -P "${IOS_DISTRIBUTION_CERTIFICATE_PASSWORD}" -A -t cert -f pkcs12 -k "${keychain_path}"
+          security list-keychain -d user -s "${keychain_path}" $(security list-keychain -d user | sed 's/[\" ]//g')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${KEYCHAIN_PASSWORD}" "${keychain_path}"
           mkdir -p "${profile_dir}"
           profile_uuid=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i "${profile_path}")")
           cp "${profile_path}" "${profile_dir}/${profile_uuid}.mobileprovision"
