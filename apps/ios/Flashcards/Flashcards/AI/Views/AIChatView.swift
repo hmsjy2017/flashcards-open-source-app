@@ -332,7 +332,7 @@ struct AIChatView: View {
                     Button(aiSettingsLocalized("common.ok", "OK")) {
                         self.acceptExternalAIConsent()
                     }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.borderedProminent)
                     .accessibilityIdentifier(UITestIdentifier.aiConsentAcceptButton)
 
                     VStack(alignment: .leading, spacing: 10) {
@@ -399,12 +399,12 @@ struct AIChatView: View {
                     Button(aiSettingsLocalized("ai.failed.openAccountStatus", "Open account status")) {
                         self.navigation.openSettings(destination: .accountStatus)
                     }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.borderedProminent)
                 } else {
                     Button(aiSettingsLocalized("common.retry", "Retry")) {
                         self.chatStore.retryLinkedBootstrap()
                     }
-                    .buttonStyle(.glassProminent)
+                    .buttonStyle(.borderedProminent)
                 }
                 if let technicalDetails = presentation?.technicalDetails, technicalDetails.isEmpty == false {
                     DisclosureGroup(aiSettingsLocalized("settings.account.cloudSignIn.technicalDetails", "Technical details")) {

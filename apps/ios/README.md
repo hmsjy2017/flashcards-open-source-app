@@ -15,7 +15,7 @@ On iOS, the UI and interaction design should stay maximally native to iOS.
 ## Platform Baseline
 
 - Language and UI stack: Swift + SwiftUI
-- Current deployment target: iOS 26.0
+- Current deployment target: iOS/iPadOS 18.0
 - Default visual direction: dark appearance with the existing orange accent color
 - Primary local storage: SQLite on device
 - Product scope should stay aligned with the supported top-level flows: Review, Progress, AI, Cards, Settings
@@ -138,9 +138,9 @@ App Store release-note drafting guidance is documented in [`docs/version-bump.md
 The expected release gate is:
 
 1. Native XCUITest grouped live smoke
-2. Xcode Cloud archive and distribution
+2. GitHub Actions IPA archive and distribution
 
-When a change lands on `main`, follow the Xcode Cloud workflow until the release either completes or fails with a concrete error. Do not assume the iOS release finished just because the GitHub-side AWS/Web release workflow is green.
+When a change lands on `main`, follow the GitHub Actions iOS IPA workflow until the release either completes or fails with a concrete error.
 
 ## Respect Existing Code
 

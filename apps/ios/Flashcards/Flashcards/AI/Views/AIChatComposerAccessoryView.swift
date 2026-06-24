@@ -198,7 +198,7 @@ extension AIChatView {
                             } label: {
                                 aiChatComposerAccessoryIcon(systemName: "paperclip")
                             }
-                            .buttonStyle(.glass)
+                            .buttonStyle(.bordered)
                             .tint(.accentColor)
                             .disabled(self.chatStore.canAttachToDraft == false)
                             .accessibilityLabel(aiSettingsLocalized("ai.composer.addAttachment", "Add attachment"))
@@ -219,7 +219,7 @@ extension AIChatView {
                                     systemName: self.chatStore.dictationState == .recording ? "stop.fill" : "mic"
                                 )
                             }
-                            .buttonStyle(.glass)
+                            .buttonStyle(.bordered)
                             .tint(self.chatStore.dictationState == .recording ? .red : .accentColor)
                             .disabled(self.chatStore.canUseDictation == false)
                             .accessibilityLabel(

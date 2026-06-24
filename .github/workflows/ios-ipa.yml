@@ -1,0 +1,168 @@
+name: iOS IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      build-number:
+        description: App Store build number override. Defaults to the GitHub run number.
+        required: false
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - apps/ios/**
+      - .github/workflows/ios-ipa.yml
+
+concurrency:
+  group: ios-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ipa:
+    name: Build signed IPA
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      XCODE_CLOUD_DEVELOPMENT_TEAM: ${{ secrets.IOS_DEVELOPMENT_TEAM }}
+      XCODE_CLOUD_APP_BUNDLE_IDENTIFIER: ${{ secrets.IOS_APP_BUNDLE_IDENTIFIER }}
+      XCODE_CLOUD_API_BASE_URL: ${{ secrets.IOS_API_BASE_URL }}
+      XCODE_CLOUD_AUTH_BASE_URL: ${{ secrets.IOS_AUTH_BASE_URL }}
+      XCODE_CLOUD_PRIVACY_POLICY_URL: ${{ secrets.IOS_PRIVACY_POLICY_URL }}
+      XCODE_CLOUD_TERMS_OF_SERVICE_URL: ${{ secrets.IOS_TERMS_OF_SERVICE_URL }}
+      XCODE_CLOUD_SUPPORT_URL: ${{ secrets.IOS_SUPPORT_URL }}
+      XCODE_CLOUD_SUPPORT_EMAIL_ADDRESS: ${{ secrets.IOS_SUPPORT_EMAIL_ADDRESS }}
+      XCODE_CLOUD_SENTRY_DSN: ${{ secrets.IOS_SENTRY_DSN }}
+      XCODE_CLOUD_SENTRY_ENVIRONMENT: production
+      XCODE_CLOUD_SENTRY_TRACES_SAMPLE_RATE: ${{ vars.IOS_SENTRY_TRACES_SAMPLE_RATE || '0.0' }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+      SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+      SENTRY_IOS_PROJECT: ${{ secrets.SENTRY_IOS_PROJECT }}
+      SENTRY_URL: ${{ secrets.SENTRY_URL }}
+      CI_XCODE_CLOUD: TRUE
+      ARCHIVE_PATH: tmp/ios-archives/Flashcards.xcarchive
+      EXPORT_PATH: tmp/ios-export
+      KEYCHAIN_PATH: ${{ runner.temp }}/ios-signing.keychain-db
+      KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16.4
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app
+
+      - name: Validate signing secrets
+        run: |
+          set -eu
+          missing=""
+          for key in IOS_DISTRIBUTION_CERTIFICATE_BASE64 IOS_DISTRIBUTION_CERTIFICATE_PASSWORD IOS_PROVISIONING_PROFILE_BASE64 IOS_KEYCHAIN_PASSWORD IOS_DEVELOPMENT_TEAM IOS_APP_BUNDLE_IDENTIFIER; do
+            if [ -z "${!key:-}" ]; then
+              missing="${missing}${missing:+, }${key}"
+            fi
+          done
+          if [ -n "${missing}" ]; then
+            echo "Missing required iOS signing secrets: ${missing}" >&2
+            exit 1
+          fi
+        env:
+          IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+          IOS_DEVELOPMENT_TEAM: ${{ secrets.IOS_DEVELOPMENT_TEAM }}
+          IOS_APP_BUNDLE_IDENTIFIER: ${{ secrets.IOS_APP_BUNDLE_IDENTIFIER }}
+
+      - name: Install signing assets
+        run: |
+          set -eu
+          certificate_path="${RUNNER_TEMP}/ios-distribution.p12"
+          profile_path="${RUNNER_TEMP}/ios-profile.mobileprovision"
+          profile_dir="${HOME}/Library/MobileDevice/Provisioning Profiles"
+          printf '%s' "${IOS_DISTRIBUTION_CERTIFICATE_BASE64}" | base64 --decode > "${certificate_path}"
+          printf '%s' "${IOS_PROVISIONING_PROFILE_BASE64}" | base64 --decode > "${profile_path}"
+          security create-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security set-keychain-settings -lut 21600 "${KEYCHAIN_PATH}"
+          security unlock-keychain -p "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          security import "${certificate_path}" -P "${IOS_DISTRIBUTION_CERTIFICATE_PASSWORD}" -A -t cert -f pkcs12 -k "${KEYCHAIN_PATH}"
+          security list-keychain -d user -s "${KEYCHAIN_PATH}" $(security list-keychain -d user | sed 's/[\" ]//g')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "${KEYCHAIN_PASSWORD}" "${KEYCHAIN_PATH}"
+          mkdir -p "${profile_dir}"
+          profile_uuid=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i "${profile_path}")")
+          cp "${profile_path}" "${profile_dir}/${profile_uuid}.mobileprovision"
+          echo "IOS_PROVISIONING_PROFILE_UUID=${profile_uuid}" >> "${GITHUB_ENV}"
+        env:
+          IOS_DISTRIBUTION_CERTIFICATE_BASE64: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_BASE64 }}
+          IOS_DISTRIBUTION_CERTIFICATE_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_CERTIFICATE_PASSWORD }}
+          IOS_PROVISIONING_PROFILE_BASE64: ${{ secrets.IOS_PROVISIONING_PROFILE_BASE64 }}
+
+      - name: Generate iOS build configuration
+        run: |
+          sh apps/ios/Flashcards/ci_scripts/ci_post_clone.sh
+          echo "APP_CURRENT_PROJECT_VERSION=${{ inputs['build-number'] || github.run_number }}" >> apps/ios/Flashcards/Config/Local.xcconfig
+
+      - name: Archive
+        run: |
+          set -eu
+          xcodebuild \
+            -project "apps/ios/Flashcards/Flashcards Open Source App.xcodeproj" \
+            -scheme "Flashcards Open Source App" \
+            -configuration Release \
+            -derivedDataPath "tmp/ios-derived-data" \
+            -destination "generic/platform=iOS" \
+            -archivePath "${ARCHIVE_PATH}" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="${XCODE_CLOUD_DEVELOPMENT_TEAM}" \
+            PROVISIONING_PROFILE_SPECIFIER="${IOS_PROVISIONING_PROFILE_UUID}" \
+            archive
+
+      - name: Upload dSYMs to Sentry
+        run: CI_ARCHIVE_PATH="${ARCHIVE_PATH}" sh apps/ios/Flashcards/ci_scripts/ci_post_xcodebuild.sh
+
+      - name: Write export options
+        run: |
+          cat > "${RUNNER_TEMP}/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>${XCODE_CLOUD_DEVELOPMENT_TEAM}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${XCODE_CLOUD_APP_BUNDLE_IDENTIFIER}</key>
+              <string>${IOS_PROVISIONING_PROFILE_UUID}</string>
+            </dict>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Export IPA
+        run: |
+          xcodebuild \
+            -exportArchive \
+            -archivePath "${ARCHIVE_PATH}" \
+            -exportPath "${EXPORT_PATH}" \
+            -exportOptionsPlist "${RUNNER_TEMP}/ExportOptions.plist"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flashcards-ios-ipa
+          path: tmp/ios-export/*.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Cleanup signing keychain
+        if: always()
+        run: security delete-keychain "${KEYCHAIN_PATH}" || true
