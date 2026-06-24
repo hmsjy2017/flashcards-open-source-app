@@ -210,7 +210,7 @@ struct AIChatView: View {
             .accessibilityIdentifier(UITestIdentifier.aiScreen)
             .navigationTitle(aiSettingsLocalized("ai.title", "AI"))
             .navigationBarTitleDisplayMode(.inline)
-            .safeAreaBar(edge: .bottom, spacing: 0) {
+            .nativeBottomAccessory {
                 self.bottomBarContent
             }
             .toolbar {

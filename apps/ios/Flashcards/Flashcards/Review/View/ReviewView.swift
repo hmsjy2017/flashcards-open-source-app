@@ -153,7 +153,7 @@ struct ReviewView: View {
         .task(id: store.localReadVersion) {
             await self.reloadReviewMetadata()
         }
-        .safeAreaBar(edge: .bottom, spacing: 0) {
+        .nativeBottomAccessory {
             reviewBottomAccessory
         }
         .simultaneousGesture(
